@@ -7,11 +7,11 @@ class VideoQuantizer
 
   attr_accessor :extract_scene_segments_command, :generate_altered_mp4s_command,
                 :onsets_hash, :perfect_beats, :path_to_video, :speed_multiples,
-                :speed_multiples_hash, :path_to_song, :path
+                :speed_multiples_hash, :path_to_song, :path, :video_duration_in_seconds
 
-  def initialize(onset_times, path_to_video, path_to_song, song_tempo=nil)
-    # main_beat = song_tempo.to_f/MINUTE_SECONDS
+  def initialize(onset_times, path_to_video, path_to_song, video_duration_in_seconds=nil)
 
+    @video_duration_in_seconds = video_duration_in_seconds
     @extract_scene_segments_command = ""
     @generate_altered_mp4s_command = ""
     @onsets_hash = {}
@@ -19,6 +19,10 @@ class VideoQuantizer
     @path_to_song = path_to_song
     @perfect_beats = []
     @path = `pwd`.gsub("\n","")
+
+    if !video_duration_in_seconds.nil? && `#{truncate_video}`
+      @path_to_video = truncated_video_path
+    end
 
     `#{get_song_beats}`
     `#{chop_song}`
@@ -50,7 +54,15 @@ class VideoQuantizer
     run_output_commands
   end
 
-private
+# private
+
+  def truncated_video_path
+    path_to_video.gsub(".mp4", "_truncated.mp4")
+  end
+
+  def truncate_video
+    "ffmpeg -ss 00:00:00 -i #{path_to_video} -t #{video_duration_in_seconds.to_f} -c copy #{truncated_video_path}"
+  end
 
   def video_duration_seconds
     `ffprobe -i #{path_to_video} -show_format -v quiet | sed -n 's/duration=//p'`.to_f
@@ -308,9 +320,6 @@ private
   def chop_song
     "ffmpeg -ss #{song_beat_first_onset} -i #{path_to_song} -acodec copy #{path_to_chopped_song}"
   end
-
-  # def fade_song
-  # end
 
   def path_to_chopped_song
     path_to_song.gsub('.mp3', '_chopped.mp3')
